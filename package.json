@@ -7,7 +7,7 @@
 		"eslint": "latest",
 		"eslint-config-prettier": "latest",
 		"prettier": "latest",
-		"typescript": "~5.9",
+		"typescript": "latest",
 		"typescript-eslint": "latest",
 		"typescript-language-server": "latest"
 	}
