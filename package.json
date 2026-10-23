@@ -1,0 +1,14 @@
+{
+	"name": "devtools",
+	"private": true,
+	"description": "Isolated TypeScript tooling. Add tools here, then run: tools update",
+	"dependencies": {
+		"@eslint/js": "latest",
+		"eslint": "latest",
+		"eslint-config-prettier": "latest",
+		"prettier": "latest",
+		"typescript": "~5.9",
+		"typescript-eslint": "latest",
+		"typescript-language-server": "latest"
+	}
+}

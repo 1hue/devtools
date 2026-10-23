@@ -1,0 +1,109 @@
+#!/bin/bash
+set -euo pipefail
+
+self=$(readlink -f "${BASH_SOURCE[0]}")
+dir=$(dirname "$self")
+name=$(basename "${BASH_SOURCE[0]}")
+
+RUNTIME=${TOOLS_RUNTIME:-podman}
+IMAGE=${TOOLS_IMAGE:-localhost/devtools}
+NODE_IMAGE=${TOOLS_NODE_IMAGE:-docker.io/library/node:26.12.1-alpine}
+
+# Run a tool from the image against the current project.
+# Network is off unless TOOLS_NET=1.
+# Project is read-only unless TOOLS_RW=1 or the args contain --write/-w/--fix.
+# TOOLS_NODE_MODULES (volume name or host path) is mounted read-only at
+# <project>/node_modules so eslint/tsc can resolve the project's packages.
+run_tool() {
+	local root mode=ro net=none arg
+	root=$(git rev-parse --show-toplevel 2>/dev/null || pwd)
+
+	[ "${TOOLS_RW:-0}" = 1 ] && mode=rw
+	[ "${TOOLS_NET:-0}" = 1 ] && net=slirp4netns
+	for arg in "$@"; do
+		case "$arg" in
+			--write|-w|--fix) mode=rw ;;
+		esac
+	done
+
+	local opts=(
+		--rm -i
+		--userns=keep-id
+		--network "$net"
+		--cap-drop=all
+		--security-opt=no-new-privileges
+		--security-opt=label=disable
+		--read-only
+		--tmpfs /tmp
+		-v "$root:$root:$mode"
+		-w "$PWD"
+	)
+	[ -t 0 ] && [ -t 1 ] && opts+=(-t)
+	[ -n "${TOOLS_NODE_MODULES:-}" ] && opts+=(-v "$TOOLS_NODE_MODULES:$root/node_modules:ro")
+
+	exec "$RUNTIME" run "${opts[@]}" "$IMAGE" "$@"
+}
+
+build_image() {
+	[ -f "$dir/package-lock.json" ] || {
+		echo "No package-lock.json yet, run: $0 update" >&2
+		exit 1
+	}
+	"$RUNTIME" build -t "$IMAGE" --build-arg "NODE_IMAGE=$NODE_IMAGE" \
+		-f "$dir/Containerfile" "$dir"
+}
+
+# The only place network access is intentional besides the image build.
+update_lock() {
+	"$RUNTIME" run --rm --userns=keep-id --cap-drop=all \
+		--security-opt=no-new-privileges --security-opt=label=disable \
+		--tmpfs /tmp -e HOME=/tmp \
+		-v "$dir:/opt/tools:rw" -w /opt/tools \
+		"$NODE_IMAGE" sh -c '
+			npm install --package-lock-only --ignore-scripts "$@" &&
+			npm update --package-lock-only --ignore-scripts
+		' sh "$@"
+}
+
+case "$name" in
+	tools|devtools)
+		case "${1:-help}" in
+			help)
+				cat <<-EOF
+				Usage: $0 <command>
+				build: build the image from the lockfile
+				update [pkg@ver...]: update the lockfile with network on, then rebuild
+				links: symlink prettier, eslint, tsc, typescript-language-server into ~/.local/bin
+				sh: shell in the tools container
+				<tool> [args]: run a tool (also available as a symlink named after it)
+				Env: TOOLS_NET=1 (network), TOOLS_RW=1 (writable project),
+				TOOLS_NODE_MODULES=<volume or path> (project node_modules, read-only)
+				EOF
+				;;
+			build)
+				build_image
+				;;
+			update)
+				shift
+				update_lock "$@"
+				echo "Review the change before trusting it: git diff $dir/package-lock.json" >&2
+				build_image
+				;;
+			links)
+				mkdir -p "$HOME/.local/bin"
+				for t in prettier eslint tsc typescript-language-server; do
+					ln -sf "$self" "$HOME/.local/bin/$t"
+				done
+				;;
+			sh)
+				run_tool sh
+				;;
+			*)
+				run_tool "$@"
+				;;
+		esac
+		;;
+	*)
+		run_tool "$name" "$@"
+		;;
+esac
