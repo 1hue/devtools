@@ -1,26 +1,6 @@
 # Containerised TypeScript & Friends
 
-**An alternative to Dev Containers and DevPod.**
-
----
-
-&nbsp;
-
-<p align="center">
-Run intellisense tools like <code>tsc</code>, <code>eslint</code>, and <code>prettier</code> in a podman container.
-</p>
-<p align="center">⇓</p>
-<p align="center">
-IDE is happy.
-</p>
-<p align="center">⇓</p>
-<p align="center">
-Your host environment stays clean.
-</p>
-
-&nbsp;
----
-&nbsp;
+An alternative to Dev Containers. Keep your host environment clean.
 
 ```sh
 ./tools build
