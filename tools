@@ -65,20 +65,40 @@ update_lock() {
 		' sh "$@"
 }
 
+# Color only on a terminal, and respect NO_COLOR.
+usage() {
+	local b= c= y= r=
+	if [ -t 1 ] && [ -z "${NO_COLOR:-}" ]; then
+		b=$'\e[1m' c=$'\e[36m' y=$'\e[33m' r=$'\e[0m'
+	fi
+	cat <<-EOF
+	${b}Usage:${r} $name COMMAND [ARG]...
+	  or:  TOOL [ARG]...
+	Run dev tools in a container, without network and with the project read-only.
+
+	${b}Commands:${r}
+	  ${c}build${r}                   build the image from the lockfile
+	  ${c}update${r} [PKG@VER]...     update the lockfile (network on), then rebuild
+	  ${c}links${r}                   symlink prettier, eslint, tsc and
+	                          typescript-language-server into ~/.local/bin
+	  ${c}sh${r}                      open a shell in the tools container
+	  ${c}TOOL${r} [ARG]...           run TOOL (also available as a symlink named TOOL)
+	  ${c}help${r}, ${c}-h${r}, ${c}--help${r}        display this help and exit
+
+	${b}Environment:${r}
+	  ${y}TOOLS_NET=1${r}             enable network
+	  ${y}TOOLS_RW=1${r}              mount the project writable (implied by --write,
+	                          -w and --fix)
+	  ${y}TOOLS_NODE_MODULES=SRC${r}  mount SRC (volume or path) read-only as the
+	                          project's node_modules
+	EOF
+}
+
 case "$name" in
 	tools|devtools)
 		case "${1:-help}" in
-			help)
-				cat <<-EOF
-				Usage: $0 <command>
-				build: build the image from the lockfile
-				update [pkg@ver...]: update the lockfile with network on, then rebuild
-				links: symlink prettier, eslint, tsc, typescript-language-server into ~/.local/bin
-				sh: shell in the tools container
-				<tool> [args]: run a tool (also available as a symlink named after it)
-				Env: TOOLS_NET=1 (network), TOOLS_RW=1 (writable project),
-				TOOLS_NODE_MODULES=<volume or path> (project node_modules, read-only)
-				EOF
+			help|-h|--help)
+				usage
 				;;
 			build)
 				build_image
