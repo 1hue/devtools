@@ -1,0 +1,10 @@
+#!/bin/bash
+
+# Base of the tools image
+NODE_IMAGE=docker.io/library/node:alpine
+
+# Minimum package age (days) for `tools build`
+MIN_RELEASE_AGE=7
+
+# Default tools for `tools link`
+LINKS=(prettier eslint tsc typescript-language-server)

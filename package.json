@@ -1,7 +1,11 @@
 {
 	"name": "devtools",
-	"private": true,
-	"description": "Isolated TypeScript tooling. Add tools here, then run: tools update",
+	"license": "MIT",
+	"author": {
+		"name": "1hue",
+		"url": "https://github.com/1hue"
+	},
+	"description": "Isolated TypeScript tooling. Add tools here, then run: tools build",
 	"dependencies": {
 		"@eslint/js": "latest",
 		"eslint": "latest",

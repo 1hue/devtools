@@ -1,25 +1,28 @@
 #!/bin/bash
 set -euo pipefail
 
-self=$(readlink -f "${BASH_SOURCE[0]}")
-dir=$(dirname "$self")
-name=$(basename "${BASH_SOURCE[0]}")
+self=$(readlink -f "${BASH_SOURCE[0]}") # this script, symlinks resolved
+dir=$(dirname "$self") # this repo
+name=$(basename "${BASH_SOURCE[0]}") # name called by: tools, or a TOOL symlink
 
-RUNTIME=${TOOLS_RUNTIME:-podman}
-IMAGE=${TOOLS_IMAGE:-localhost/devtools}
-NODE_IMAGE=${TOOLS_NODE_IMAGE:-docker.io/library/node:26.12.1-alpine}
+source "$dir/config" # NODE_IMAGE, MIN_RELEASE_AGE, LINKS
+
+RUNTIME=${TOOLS_RUNTIME:-podman} # podman-only: --userns=keep-id
+IMAGE=${TOOLS_IMAGE:-localhost/devtools} # tools image, built by `tools build`
+NODE_IMAGE=${TOOLS_NODE_IMAGE:-$NODE_IMAGE}
+BIN=$HOME/.local/bin # where `tools link` puts symlinks
 
 # Run a tool from the image against the current project.
 # Network is off unless TOOLS_NET=1.
 # Project is read-only unless TOOLS_RW=1 or the args contain --write/-w/--fix.
-# TOOLS_NODE_MODULES (volume name or host path) is mounted read-only at
-# <project>/node_modules so eslint/tsc can resolve the project's packages.
+# The project's own node_modules (installed by its container) is used for
+# eslint config imports, type resolution and go-to-definition.
 run_tool() {
 	local root mode=ro net=none arg
 	root=$(git rev-parse --show-toplevel 2>/dev/null || pwd)
 
 	[ "${TOOLS_RW:-0}" = 1 ] && mode=rw
-	[ "${TOOLS_NET:-0}" = 1 ] && net=slirp4netns
+	[ "${TOOLS_NET:-0}" = 1 ] && net=pasta
 	for arg in "$@"; do
 		case "$arg" in
 			--write|-w|--fix) mode=rw ;;
@@ -27,70 +30,77 @@ run_tool() {
 	done
 
 	local opts=(
-		--rm -i
-		--userns=keep-id
+		--rm -i # -i: stdin for LSP stdio and piped input
+		--userns=keep-id # run as you, so written files are yours
 		--network "$net"
 		--cap-drop=all
 		--security-opt=no-new-privileges
-		--security-opt=label=disable
-		--read-only
+		--security-opt=label=disable # SELinux: don't relabel arbitrary project dirs
+		--read-only # container fs immutable; scratch in /tmp
 		--tmpfs /tmp
-		-v "$root:$root:$mode"
+		-v "$root:$root:$mode" # same path as host, so editor paths match
 		-w "$PWD"
 	)
 	[ -t 0 ] && [ -t 1 ] && opts+=(-t)
-	[ -n "${TOOLS_NODE_MODULES:-}" ] && opts+=(-v "$TOOLS_NODE_MODULES:$root/node_modules:ro")
+	[ -f "$root/package.json" ] && [ ! -d "$root/node_modules" ] &&
+		echo "$name: no node_modules in $root, install deps in the project's container" >&2
 
 	exec "$RUNTIME" run "${opts[@]}" "$IMAGE" "$@"
 }
 
+# The only place network access is intentional.
+# --no-cache: otherwise an unchanged package.json reuses the old install.
 build_image() {
-	[ -f "$dir/package-lock.json" ] || {
-		echo "No package-lock.json yet, run: $0 update" >&2
-		exit 1
-	}
-	"$RUNTIME" build -t "$IMAGE" --build-arg "NODE_IMAGE=$NODE_IMAGE" \
+	"$RUNTIME" build --pull=newer --no-cache -t "$IMAGE" \
+		--build-arg "NODE_IMAGE=$NODE_IMAGE" \
+		--build-arg "MIN_RELEASE_AGE=$MIN_RELEASE_AGE" \
 		-f "$dir/Containerfile" "$dir"
 }
 
-# The only place network access is intentional besides the image build.
-update_lock() {
-	"$RUNTIME" run --rm --userns=keep-id --cap-drop=all \
-		--security-opt=no-new-privileges --security-opt=label=disable \
-		--tmpfs /tmp -e HOME=/tmp \
-		-v "$dir:/opt/tools:rw" -w /opt/tools \
-		"$NODE_IMAGE" sh -c '
-			npm install --package-lock-only --ignore-scripts "$@" &&
-			npm update --package-lock-only --ignore-scripts
-		' sh "$@"
+# Symlink the given tools (default: LINKS) into BIN, and remove links to
+# this script that are no longer wanted.
+link_tools() {
+	local want=("$@") f t
+	[ $# -gt 0 ] || want=("${LINKS[@]}")
+	mkdir -p "$BIN"
+
+	for f in "$BIN"/*; do
+		[ -L "$f" ] && [ "$(readlink -f "$f")" = "$self" ] || continue
+		t=$(basename "$f")
+		case " tools devtools ${want[*]} " in
+			*" $t "*) ;;
+			*) rm "$f" && echo "unlinked $t" ;;
+		esac
+	done
+	for t in "${want[@]}"; do
+		ln -sfn "$self" "$BIN/$t" && echo "linked $t"
+	done
 }
 
 # Color only on a terminal, and respect NO_COLOR.
 usage() {
-	local b= c= y= r=
+	local bold= cyan= yellow= reset=
 	if [ -t 1 ] && [ -z "${NO_COLOR:-}" ]; then
-		b=$'\e[1m' c=$'\e[36m' y=$'\e[33m' r=$'\e[0m'
+		bold=$'\e[1m' cyan=$'\e[36m' yellow=$'\e[33m' reset=$'\e[0m'
 	fi
 	cat <<-EOF
-	${b}Usage:${r} $name COMMAND [ARG]...
+	${bold}Usage:${reset} $name COMMAND [ARG]...
 	  or:  TOOL [ARG]...
 	Run dev tools in a container, without network and with the project read-only.
 
-	${b}Commands:${r}
-	  ${c}build${r}                   build the image from the lockfile
-	  ${c}update${r} [PKG@VER]...     update the lockfile (network on), then rebuild
-	  ${c}links${r}                   symlink prettier, eslint, tsc and
-	                          typescript-language-server into ~/.local/bin
-	  ${c}sh${r}                      open a shell in the tools container
-	  ${c}TOOL${r} [ARG]...           run TOOL (also available as a symlink named TOOL)
-	  ${c}help${r}, ${c}-h${r}, ${c}--help${r}        display this help and exit
+	${bold}Commands:${reset}
+	  ${cyan}build${reset}                   build the image with the newest tools (network on)
+	  ${cyan}link${reset} [TOOL]...          symlink TOOLs into ~/.local/bin and remove other
+	                          links to this script; default TOOLs:
+	                          ${LINKS[*]}
+	  ${cyan}sh${reset}                      open a shell in the tools container
+	  ${cyan}TOOL${reset} [ARG]...           run TOOL (also available as a symlink named TOOL)
+	  ${cyan}help${reset}, ${cyan}-h${reset}, ${cyan}--help${reset}        display this help and exit
 
-	${b}Environment:${r}
-	  ${y}TOOLS_NET=1${r}             enable network
-	  ${y}TOOLS_RW=1${r}              mount the project writable (implied by --write,
+	${bold}Environment:${reset}
+	  ${yellow}TOOLS_NET=1${reset}             enable network
+	  ${yellow}TOOLS_RW=1${reset}              mount the project writable (implied by --write,
 	                          -w and --fix)
-	  ${y}TOOLS_NODE_MODULES=SRC${r}  mount SRC (volume or path) read-only as the
-	                          project's node_modules
 	EOF
 }
 
@@ -103,17 +113,9 @@ case "$name" in
 			build)
 				build_image
 				;;
-			update)
+			link)
 				shift
-				update_lock "$@"
-				echo "Review the change before trusting it: git diff $dir/package-lock.json" >&2
-				build_image
-				;;
-			links)
-				mkdir -p "$HOME/.local/bin"
-				for t in prettier eslint tsc typescript-language-server; do
-					ln -sf "$self" "$HOME/.local/bin/$t"
-				done
+				link_tools "$@"
 				;;
 			sh)
 				run_tool sh

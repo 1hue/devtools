@@ -1,11 +1,13 @@
-ARG NODE_IMAGE=docker.io/library/node:26.12.1-alpine
+# Set from config by `tools build`
+ARG NODE_IMAGE
 FROM ${NODE_IMAGE}
+ARG MIN_RELEASE_AGE
 
 WORKDIR /opt/tools
-COPY package.json package-lock.json ./
+COPY package.json ./
 
-# Versions come from the lockfile; install scripts never run
-RUN npm ci --ignore-scripts --no-audit --no-fund
+# Newest versions at least MIN_RELEASE_AGE days old; install scripts never run
+RUN npm install --ignore-scripts --no-fund --min-release-age=${MIN_RELEASE_AGE}
 
 ENV PATH=/opt/tools/node_modules/.bin:$PATH
 ENV NODE_PATH=/opt/tools/node_modules
