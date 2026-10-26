@@ -10,5 +10,4 @@ COPY package.json ./
 RUN npm install --ignore-scripts --no-fund --min-release-age=${MIN_RELEASE_AGE}
 
 ENV PATH=/opt/tools/node_modules/.bin:$PATH
-ENV NODE_PATH=/opt/tools/node_modules
 ENV HOME=/tmp

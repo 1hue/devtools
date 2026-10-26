@@ -7,4 +7,7 @@ NODE_IMAGE=docker.io/library/node:alpine
 MIN_RELEASE_AGE=7
 
 # Default tools for `tools link`
-LINKS=(prettier eslint tsc typescript-language-server)
+LINKS=(node prettier eslint tsc)
+
+# Tools taken from project's node_modules when installed there (still run in container)
+PROJECT_TOOLS=(eslint)
