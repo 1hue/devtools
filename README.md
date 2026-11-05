@@ -35,12 +35,8 @@ make link # ~/.local/bin, needs to be in PATH
 
 ## Notes
 
-- No network, unless `TOOLS_NET=1`
-- Mounts git root (or cwd), read-only unless `--write`/`-w`/`--fix` or `TOOLS_RW=1`, so `tsc --noEmit`. Refuses `/` and `~`.
-  - Incremental projects (e.g. Next.js): add `--incremental false`, otherwise tsc fails writing `tsconfig.tsbuildinfo`.
-- TypeScript 7: no `tsserver.js`, so no typescript-language-server. Editors use `tsc --lsp`.
-- VS Code/VSCodium: built-in TypeScript and ESLint/Prettier extensions run on host, not here. Use tasks (`$tsc-watch`, `$eslint-stylish`) to run via container.
-- Uses own versions, not project's: latest release older than `MIN_RELEASE_AGE` days. No lockfile, rebuild to update.
-  - Except `PROJECT_TOOLS` (eslint): project's copy if installed, since plugins are tied to eslint version. Still runs in container.
-- Install scripts are off.
-- Settings are in `Makefile`, `PROJECT_TOOLS` in `scripts/run.sh`. New tools go in `image/package.json`, then rebuild.
+- Mounts only git root of cwd. Read-only unless `--write`/`-w`/`--fix` or `TOOLS_RW=1`.
+- No network unless `TOOLS_NET=1`.
+- Tools come from image, not project. Rebuild to update. Except eslint, which uses project's copy.
+- VS Code extensions run on host. Use tasks to run via container.
+- New tools go in `image/package.json`.
