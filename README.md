@@ -3,8 +3,8 @@
 An alternative to Dev Containers. Keep your host environment clean.
 
 ```sh
-./tools build
-./tools link # ~/.local/bin, needs to be in PATH
+make build
+make link # ~/.local/bin, needs to be in PATH
 ```
 &nbsp;
 
@@ -20,14 +20,14 @@ An alternative to Dev Containers. Keep your host environment clean.
 
 | Command | |
 | --- | --- |
-| `./tools build` | Build image with newest tools |
-| `./tools link` | Symlink in `~/.local/bin` as per [`config`](./config) |
-| `./tools link eslint prettier` | Link only these, drop other links |
-| `./tools unlink` | Remove all links |
-| `./tools sh` | Shell into container |
-| `./tools prettier --check .` | Run prettier |
-| `./tools help` | Docs |
-| `eslint .` | Via symlink, same as `./tools eslint .` |
+| `make build` | Build image with newest tools |
+| `make link` | Symlink in `~/.local/bin` as per `LINKS` in [`Makefile`](./Makefile) |
+| `make link LINKS="eslint prettier"` | Link only these, drop other links |
+| `make unlink` | Remove all links |
+| `make sh` | Shell into container |
+| `scripts/run.sh prettier --check .` | Run prettier |
+| `scripts/run.sh --help` | Docs |
+| `eslint .` | Via symlink, same as `scripts/run.sh eslint .` |
 | `node script.js` | Node from image |
 | `tsc --lsp --stdio` | Editor LSP command (Neovim, Helix etc.). Paths same as on host |
 
@@ -43,4 +43,4 @@ An alternative to Dev Containers. Keep your host environment clean.
 - Uses own versions, not project's: latest release older than `MIN_RELEASE_AGE` days. No lockfile, rebuild to update.
   - Except `PROJECT_TOOLS` (eslint): project's copy if installed, since plugins are tied to eslint version. Still runs in container.
 - Install scripts are off.
-- Settings are in `config`. New tools go in `package.json`, then rebuild.
+- Settings are in `Makefile`, `PROJECT_TOOLS` in `scripts/run.sh`. New tools go in `image/package.json`, then rebuild.

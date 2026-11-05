@@ -1,4 +1,4 @@
-# Set from config by `tools build`
+# Set from Makefile by `make build`
 ARG NODE_IMAGE
 FROM ${NODE_IMAGE}
 ARG MIN_RELEASE_AGE

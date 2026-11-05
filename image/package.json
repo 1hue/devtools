@@ -5,7 +5,7 @@
 		"name": "1hue",
 		"url": "https://github.com/1hue"
 	},
-	"description": "Isolated TypeScript tooling. Add tools here and run: tools build",
+	"description": "Isolated TypeScript tooling. Add tools here and run: make build",
 	"dependencies": {
 		"eslint": "latest",
 		"prettier": "latest",
