@@ -1,7 +1,6 @@
-# Set from Makefile by `make build`
-ARG NODE_IMAGE
-FROM ${NODE_IMAGE}
-ARG MIN_RELEASE_AGE
+FROM docker.io/library/node:alpine
+# Minimum package age (days)
+ARG MIN_RELEASE_AGE=7
 
 WORKDIR /opt/tools
 COPY package.json ./

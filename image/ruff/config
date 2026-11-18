@@ -1,0 +1,6 @@
+#!/bin/bash
+
+# Tools in this image
+TOOLS=(ruff)
+# Arguments that make a tool write files
+WRITE_ARGS=(--fix)

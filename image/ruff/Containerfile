@@ -1,0 +1,10 @@
+FROM ghcr.io/astral-sh/ruff:latest AS ruff
+
+FROM docker.io/library/alpine:latest
+
+# Ruff binary is static, so it runs on Alpine
+COPY --from=ruff /ruff /usr/local/bin/ruff
+
+ENV HOME=/tmp
+# Project is usually mounted read-only
+ENV RUFF_CACHE_DIR=/tmp/ruff

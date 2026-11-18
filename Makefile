@@ -1,21 +1,22 @@
-# Tools image and host links
+# Tool images and host links
 .PHONY: build link unlink sh
 
-IMAGE = localhost/devtools
-# Base of tools image
-NODE_IMAGE = docker.io/library/node:alpine
-# Minimum package age (days)
-MIN_RELEASE_AGE = 7
+# Image folders, each built as PREFIX + folder name
+IMAGES = $(notdir $(wildcard image/*))
+PREFIX = localhost/devtools-
 
 # Default tools for link
-LINKS = node prettier eslint tsc
+LINKS = $(shell $(RUNNER) --list)
 BIN = $(HOME)/.local/bin
 RUNNER = $(CURDIR)/scripts/run.sh
 
-# Build image with newest tools
+# Build every image with newest tools
+build: $(addprefix build-,$(IMAGES))
+
+# Build one image, like make build-node
 # Unchanged package.json reuses old install without --no-cache
-build:
-	podman build --pull=newer --no-cache -t $(IMAGE) --build-arg NODE_IMAGE=$(NODE_IMAGE) --build-arg MIN_RELEASE_AGE=$(MIN_RELEASE_AGE) image
+build-%:
+	podman build --pull=newer --no-cache -t $(PREFIX)$* image/$*
 
 # Symlink LINKS into BIN, replacing other links to run.sh
 link: unlink
@@ -26,6 +27,7 @@ unlink:
 	mkdir -p $(BIN)
 	find $(BIN) -maxdepth 1 -lname $(RUNNER) -printf 'unlinked %f\n' -delete
 
-# Shell into tools container
+# Shell into IMAGE container, like make sh IMAGE=node
 sh:
-	scripts/run.sh sh
+	$(if $(IMAGE),,$(error Set IMAGE to one of: $(IMAGES)))
+	TOOLS_IMAGE=$(IMAGE) scripts/run.sh sh

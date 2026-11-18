@@ -1,0 +1,10 @@
+#!/bin/bash
+
+# Tools in this image
+TOOLS=(node prettier eslint tsc)
+# Tools taken from project's PROJECT_BIN when installed there (still run in container)
+PROJECT_TOOLS=(eslint)
+# Project's tool folder, relative to cwd
+PROJECT_BIN=node_modules/.bin
+# Arguments that make a tool write files
+WRITE_ARGS=(--write -w --fix)
